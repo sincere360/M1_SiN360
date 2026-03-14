@@ -1,68 +1,112 @@
-<!-- See COPYING.txt for license details. -->
+# M1 SiN360 Firmware
 
-# M1 Firmware
+Custom firmware for the Monstatek M1 multi-protocol security research device, built on STM32H5.
 
-Firmware for the M1 NFC/RFID multi-protocol device, built on STM32H5.
+Forked from the original Monstatek M1 firmware (v0.8) with completed feature stubs, new tools, and build system fixes.
 
-## Overview
+## What's New in SiN360 v0.9
 
-The M1 firmware provides support for:
+### Completed Features (formerly stubs)
+- **USB-UART Bridge** -- Full runtime CDC mode switching with status screen, transparent bridge operation
+- **Sub-GHz Radio Settings** -- Configurable frequency band (300-915 MHz), modulation (OOK/ASK/FSK), TX power (4 levels)
+- **Sub-GHz Recording** -- Live signal feedback showing real-time sample count during recording
+- **125 kHz RFID Utilities**
+  - **Clone Card** -- Quick read-to-write flow for T5577 without saving to SD
+  - **Brute Force FC** -- Cycle H10301 facility codes 0-255 with progress bar, pause/resume
+- **IR Universal Remote** -- Built-in database with 15 TV brands (Samsung, LG, Sony, Philips, Panasonic, Vizio, TCL/Roku, Hisense, Toshiba, Sharp, Insignia, Sanyo, Magnavox, and 2 generic NEC profiles), 8-14 commands per brand
 
-- **NFC** (13.56 MHz)
-- **LF RFID** (125 kHz)
-- **Sub-GHz** (315–915 MHz)
-- **Infrared** (IR transmit/receive)
-- **Bluetooth** (BLE scan, advertise, GATT; via ESP32 co-processor)
-- **WiFi** (AP scan, station/AP modes; via ESP32 co-processor)
-- **Battery** monitoring
-- **Display** (ST7586s ERC240160)
-- **USB** (CDC, MSC)
+### Build System Fixes
+- **Fixed CRC generation** -- Replaced broken srec_cat CRC with correct STM32 hardware CRC32 append via Python script
+- **SD card updates now work reliably** -- Users with original firmware can update via SD card without CRC failures
+- **Clean build output** -- Single firmware binary with correct naming
+
+### Boot Screen
+- Shows "SiN360" branding below version number
+
+## Roadmap
+
+- **Phase 1** (in progress): NFC Tools, Settings menus, Bluetooth config
+- **Phase 2**: WiFi attack suite via ESP32-C6 (deauth, beacon spam, evil portal, packet monitor)
+- **Phase 3**: BadUSB HID keyboard with DuckyScript interpreter
+- **Phase 4**: BadUSB over BLE
+- **Phase 5**: Favorites, logging, file manager, OTA updates, Lua scripting engine
 
 ## Hardware
 
-- **MCU:** STM32H573VIT6 (32-bit, 2MB Flash, 100LQFP)
-- **Hardware revision:** 2.x
+- **MCU**: STM32H573VIT6 (Cortex-M33, 2MB Flash, 640KB RAM)
+- **Sub-GHz**: Si446x radio (300-915 MHz)
+- **NFC**: ST25R3916 (13.56 MHz)
+- **LF RFID**: 125 kHz read/write/emulate (EM4100, H10301, T5577)
+- **IR**: IRMP/IRSND library (NEC, Samsung32, RC5, SIRCS, Kaseikyo + more)
+- **Wireless**: ESP32-C6 co-processor (WiFi + BLE)
+- **Display**: ST7586s ERC240160 (128x64)
+- **USB**: CDC + MSC composite device
+- **Hardware revision**: 2.x
 
-See [HARDWARE.md](HARDWARE.md) for more details.
-
-## Documentation
-
-- [Build Tool (mbt)](documentation/mbt.md) – Build with STM32CubeIDE or VS Code
-- [Architecture](ARCHITECTURE.md) – Project structure
-- [Development](DEVELOPMENT.md) – Development guidelines
+See HARDWARE.md for pin mapping and schematic details.
 
 ## Building
 
-**See [documentation/mbt.md](documentation/mbt.md) for full build instructions** (STM32CubeIDE and VS Code setup, extensions, and optional post-build CRC).
-
 ### Prerequisites
 
-- **STM32CubeIDE 1.17+** (recommended), or  
-- **VS Code** with ARM GCC 14.2, CMake Tools, Cortex-Debug, and Ninja, or
-- **Linux** with ARM GCC toolchain and Ninja
+- ARM GCC toolchain (arm-none-eabi-gcc 14.2+)
+- CMake 3.22+
+- Ninja build system
+- Python 3 (for CRC generation)
 
-### Build steps
+### Linux (command line)
 
-**Linux:**  
-```bash
+```
 make
 ```
 
-Output: `./artifacts/` (MonstaTek_M1_v0800.elf, .bin, .hex)
+Output: ./artifacts/M1_SiN360_v0.9.bin (SD card update file with CRC)
 
-**STM32CubeIDE:**  
+### VS Code
+
+1. Install extensions: CMake Tools, Cortex-Debug
+2. Configure the project (select gcc-14_2_build-release)
+3. Build via the Build icon
+
+Output: ./out/build/gcc-14_2_build-release/M1_SiN360_v0.9_SD.bin
+
+### STM32CubeIDE
+
 Open the project and build in the IDE.
 
-**VS Code:**  
-1. Configure the project (e.g. `gcc-14_2_build-release` or `gcc-14_2_build-debug`)  
-2. Build via the Build icon  
+## Flashing
 
-Output: `./out/build/gcc-14_2_build-release` (VS Code) or `./Release` (STM32CubeIDE)
+### Via ST-Link (development)
+
+Connect ST-Link V2 to the M1 GPIO header:
+- Pin 10 (PA14) -> SWCLK
+- Pin 11 (PA13) -> SWDIO
+- Pin 8 or 18 (GND) -> GND
+
+```
+st-flash write M1_SiN360_v0.9.bin 0x08000000
+```
+
+### Via SD Card (recommended for users)
+
+1. Copy M1_SiN360_v0.9.bin to your M1's SD card
+2. On the M1: Settings > Firmware Update
+3. Browse to the file and select it
+4. Wait for "UPDATE COMPLETED" and reboot
+
+Works from original Monstatek firmware or any previous SiN360 version.
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](.github/CONTRIBUTING.md) and the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
+Contributions are welcome. See CONTRIBUTING.md and the Code of Conduct.
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+See LICENSE for details.
+
+## Credits
+
+- **Monstatek** -- Original M1 hardware and base firmware
+- **SiN360** -- Custom firmware development, feature completion, build fixes
+- **IRMP/IRSND** -- IR protocol library by Frank Meyer
+- **Flipper Zero community** -- IR code database references
