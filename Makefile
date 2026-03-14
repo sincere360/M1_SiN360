@@ -4,8 +4,8 @@ all: check_env build
 
 # Check if the ARM compiler and srec_cat are in the PATH
 check_env:
-	@if ! command -v arm-none-eabi-gcc >/dev/null 2>&1 || ! command -v srec_cat >/dev/null 2>&1; then \
-		echo "Error: Missing dependencies (arm-none-eabi-gcc, srec_cat)."; \
+	@if ! command -v arm-none-eabi-gcc >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then \
+		echo "Error: Missing dependencies (arm-none-eabi-gcc, python3)."; \
 		echo "Run 'make setup' first to install dependencies."; \
 		exit 1; \
 	fi
