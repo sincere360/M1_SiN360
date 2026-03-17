@@ -20,7 +20,10 @@
 #include "m1_infrared.h"
 #include "irmp.h"
 #include "irsnd.h"
-
+#include "m1_storage.h"
+#include "m1_file_browser.h"
+#include "m1_file_util.h"
+#include "ff.h"
 
 /*************************** D E F I N E S ************************************/
 
@@ -566,8 +569,375 @@ static void uremote_draw(uint8_t dev_idx, uint8_t cmd_idx, uint8_t sending)
 
     m1_u8g2_nextpage();
 }
+/* ==== Flipper .ir file support ==== */
+#define IR_FILE_MAX_CMDS    32
+#define IR_FILE_LABEL_LEN   24
+#define IR_FILE_PATH        "/infrared"
+#define IR_FILE_LINE_MAX    128
 
-void infrared_universal_remotes(void)
+typedef struct {
+    char     label[IR_FILE_LABEL_LEN];
+    uint8_t  protocol;
+    uint16_t address;
+    uint16_t command;
+} ir_file_cmd_t;
+
+static ir_file_cmd_t ir_file_cmds[IR_FILE_MAX_CMDS];
+static uint8_t ir_file_cmd_count = 0;
+static char ir_file_name[64];
+
+/* Map Flipper protocol name to IRMP protocol number */
+static uint8_t ir_map_protocol(const char *name)
+{
+    if (strstr(name, "Samsung48"))  return IRMP_SAMSUNG48_PROTOCOL;
+    if (strstr(name, "Samsung32"))  return IRMP_SAMSUNG32_PROTOCOL;
+    if (strstr(name, "NEC42"))      return IRMP_NEC42_PROTOCOL;
+    if (strstr(name, "NECext"))     return IRMP_NEC_PROTOCOL;
+    if (strstr(name, "NEC"))        return IRMP_NEC_PROTOCOL;
+    if (strstr(name, "RC6"))        return IRMP_RC6_PROTOCOL;
+    if (strstr(name, "RC5"))        return IRMP_RC5_PROTOCOL;
+    if (strstr(name, "SIRC"))       return IRMP_SIRCS_PROTOCOL;
+    if (strstr(name, "Sony"))       return IRMP_SIRCS_PROTOCOL;
+    if (strstr(name, "Kaseikyo"))   return IRMP_KASEIKYO_PROTOCOL;
+    if (strstr(name, "Panasonic"))  return IRMP_KASEIKYO_PROTOCOL;
+    if (strstr(name, "Denon"))      return IRMP_DENON_PROTOCOL;
+    if (strstr(name, "Sharp"))      return IRMP_DENON_PROTOCOL;
+    if (strstr(name, "JVC"))        return IRMP_JVC_PROTOCOL;
+    if (strstr(name, "BOSE"))       return IRMP_BOSE_PROTOCOL;
+    if (strstr(name, "LG"))         return IRMP_LGAIR_PROTOCOL;
+    return 0xFF; /* unknown */
+}
+
+/* Parse Flipper 4-byte hex "07 00 00 00" to uint16_t (LSB first) */
+static uint16_t ir_parse_flipper_hex(const char *hex_str)
+{
+    unsigned int b0 = 0, b1 = 0;
+    const char *p = hex_str;
+    /* Skip leading whitespace */
+    while (*p == ' ') p++;
+    /* Parse first byte */
+    b0 = 0;
+    while ((*p >= '0' && *p <= '9') || (*p >= 'A' && *p <= 'F') || (*p >= 'a' && *p <= 'f'))
+    {
+        b0 <<= 4;
+        if (*p >= '0' && *p <= '9') b0 |= (*p - '0');
+        else if (*p >= 'A' && *p <= 'F') b0 |= (*p - 'A' + 10);
+        else if (*p >= 'a' && *p <= 'f') b0 |= (*p - 'a' + 10);
+        p++;
+    }
+    /* Skip space */
+    while (*p == ' ') p++;
+    /* Parse second byte */
+    b1 = 0;
+    while ((*p >= '0' && *p <= '9') || (*p >= 'A' && *p <= 'F') || (*p >= 'a' && *p <= 'f'))
+    {
+        b1 <<= 4;
+        if (*p >= '0' && *p <= '9') b1 |= (*p - '0');
+        else if (*p >= 'A' && *p <= 'F') b1 |= (*p - 'A' + 10);
+        else if (*p >= 'a' && *p <= 'f') b1 |= (*p - 'a' + 10);
+        p++;
+    }
+    return (uint16_t)(b0 | (b1 << 8));
+}
+
+/* Parse a Flipper .ir file and fill ir_file_cmds[] */
+static uint8_t ir_parse_file(const S_M1_file_info *f_info)
+{
+    FIL fil;
+    char line[IR_FILE_LINE_MAX];
+    ir_file_cmd_count = 0;
+
+    char fullpath[128];
+    snprintf(fullpath, sizeof(fullpath), "%s/%s", f_info->dir_name, f_info->file_name);
+
+    FRESULT fres = f_open(&fil, fullpath, FA_READ);
+    if (fres != FR_OK)
+    {
+        /* Try without extra slash */
+        snprintf(fullpath, sizeof(fullpath), "%s%s", f_info->dir_name, f_info->file_name);
+        fres = f_open(&fil, fullpath, FA_READ);
+        if (fres != FR_OK)
+            return 0;
+    }
+
+    char cur_name[IR_FILE_LABEL_LEN] = "";
+    char cur_protocol[32] = "";
+    char cur_address[32] = "";
+    char cur_command[32] = "";
+    uint8_t cur_type_parsed = 0;
+    uint8_t have_command = 0;
+
+    while (f_gets(line, sizeof(line), &fil) != NULL)
+    {
+        /* Trim trailing whitespace/CR/LF */
+        int len = strlen(line);
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r' || line[len-1] == ' ' || line[len-1] == '\t'))
+            line[--len] = '\0';
+
+        /* Skip empty lines and comments */
+        if (len == 0) continue;
+        if (line[0] == '#') continue;
+        if (strncmp(line, "Filetype:", 9) == 0) continue;
+        if (strncmp(line, "Version:", 8) == 0) continue;
+
+        if (strncmp(line, "name: ", 6) == 0)
+        {
+            /* Save previous command if complete */
+            if (have_command && cur_type_parsed && cur_protocol[0])
+            {
+                uint8_t proto = ir_map_protocol(cur_protocol);
+                if (proto != 0xFF && ir_file_cmd_count < IR_FILE_MAX_CMDS)
+                {
+                    ir_file_cmd_t *cmd = &ir_file_cmds[ir_file_cmd_count];
+                    strncpy(cmd->label, cur_name, IR_FILE_LABEL_LEN - 1);
+                    cmd->label[IR_FILE_LABEL_LEN - 1] = '\0';
+                    cmd->protocol = proto;
+                    cmd->address = ir_parse_flipper_hex(cur_address);
+                    cmd->command = ir_parse_flipper_hex(cur_command);
+                    ir_file_cmd_count++;
+                }
+            }
+            /* Start new command */
+            strncpy(cur_name, &line[6], IR_FILE_LABEL_LEN - 1);
+            cur_name[IR_FILE_LABEL_LEN - 1] = '\0';
+            cur_protocol[0] = '\0';
+            cur_address[0] = '\0';
+            cur_command[0] = '\0';
+            cur_type_parsed = 0;
+            have_command = 1;
+        }
+        else if (strncmp(line, "type: parsed", 12) == 0)
+        {
+            cur_type_parsed = 1;
+        }
+        else if (strncmp(line, "type: raw", 9) == 0)
+        {
+            cur_type_parsed = 0;
+        }
+        else if (strncmp(line, "protocol: ", 10) == 0)
+        {
+            strncpy(cur_protocol, &line[10], sizeof(cur_protocol) - 1);
+            cur_protocol[sizeof(cur_protocol) - 1] = '\0';
+        }
+        else if (strncmp(line, "address: ", 9) == 0)
+        {
+            strncpy(cur_address, &line[9], sizeof(cur_address) - 1);
+            cur_address[sizeof(cur_address) - 1] = '\0';
+        }
+        else if (strncmp(line, "command: ", 9) == 0)
+        {
+            strncpy(cur_command, &line[9], sizeof(cur_command) - 1);
+            cur_command[sizeof(cur_command) - 1] = '\0';
+        }
+    }
+
+    /* Flush last command */
+    if (have_command && cur_type_parsed && cur_protocol[0])
+    {
+        uint8_t proto = ir_map_protocol(cur_protocol);
+        if (proto != 0xFF && ir_file_cmd_count < IR_FILE_MAX_CMDS)
+        {
+            ir_file_cmd_t *cmd = &ir_file_cmds[ir_file_cmd_count];
+            strncpy(cmd->label, cur_name, IR_FILE_LABEL_LEN - 1);
+            cmd->label[IR_FILE_LABEL_LEN - 1] = '\0';
+            cmd->protocol = proto;
+            cmd->address = ir_parse_flipper_hex(cur_address);
+            cmd->command = ir_parse_flipper_hex(cur_command);
+            ir_file_cmd_count++;
+        }
+    }
+
+    f_close(&fil);
+    return ir_file_cmd_count;
+}
+
+/* Draw the .ir file command browser */
+static void ir_file_draw(uint8_t cmd_idx, uint8_t sending)
+{
+    char line[32];
+
+    u8g2_FirstPage(&m1_u8g2);
+    u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_TXT);
+
+    /* Header: filename */
+    u8g2_SetFont(&m1_u8g2, M1_DISP_MAIN_MENU_FONT_N);
+    u8g2_DrawStr(&m1_u8g2, 1, 10, ir_file_name);
+
+    /* Command list — 3 visible */
+    u8g2_SetFont(&m1_u8g2, M1_DISP_SUB_MENU_FONT_N);
+    uint8_t visible_start = 0;
+    if (cmd_idx > 1 && ir_file_cmd_count > 3)
+        visible_start = (cmd_idx - 1 > ir_file_cmd_count - 3) ? ir_file_cmd_count - 3 : cmd_idx - 1;
+
+    for (uint8_t i = 0; i < 3 && (visible_start + i) < ir_file_cmd_count; i++)
+    {
+        uint8_t ci = visible_start + i;
+        uint8_t y = 24 + i * 12;
+
+        if (ci == cmd_idx)
+        {
+            u8g2_DrawBox(&m1_u8g2, 0, y - 9, 128, 11);
+            u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_BG);
+            u8g2_SetFont(&m1_u8g2, M1_DISP_SUB_MENU_FONT_B);
+            u8g2_DrawStr(&m1_u8g2, 4, y, ir_file_cmds[ci].label);
+            if (sending)
+                u8g2_DrawStr(&m1_u8g2, 88, y, ">> TX");
+            u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_TXT);
+            u8g2_SetFont(&m1_u8g2, M1_DISP_SUB_MENU_FONT_N);
+        }
+        else
+        {
+            u8g2_DrawStr(&m1_u8g2, 4, y, ir_file_cmds[ci].label);
+        }
+    }
+
+    if (ir_file_cmd_count > 3)
+    {
+        snprintf(line, sizeof(line), "%d/%d", cmd_idx + 1, ir_file_cmd_count);
+        u8g2_DrawStr(&m1_u8g2, 100, 48, line);
+    }
+
+    u8g2_DrawBox(&m1_u8g2, 0, 52, 128, 12);
+    u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_BG);
+    u8g2_SetFont(&m1_u8g2, M1_DISP_SUB_MENU_FONT_N);
+    u8g2_DrawStr(&m1_u8g2, 2, 61, "OK=Send  Back=Exit");
+    u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_TXT);
+    m1_u8g2_nextpage();
+}
+/* Run the .ir file remote */
+static void ir_file_remote_run(const S_M1_file_info *f_info)
+{
+    S_M1_Buttons_Status this_button_status;
+    S_M1_Main_Q_t q_item;
+    BaseType_t ret;
+    uint8_t cmd_idx = 0;
+    uint8_t ir_tx_active = 0;
+
+    /* Parse the file */
+    uint8_t count = ir_parse_file(f_info);
+    if (count == 0)
+    {
+        u8g2_FirstPage(&m1_u8g2);
+        u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_TXT);
+        u8g2_SetFont(&m1_u8g2, M1_DISP_RUN_MENU_FONT_B);
+        u8g2_DrawStr(&m1_u8g2, 4, 15, "No commands found");
+        u8g2_SetFont(&m1_u8g2, M1_DISP_SUB_MENU_FONT_N);
+        u8g2_DrawStr(&m1_u8g2, 4, 30, f_info->file_name);
+        m1_u8g2_nextpage();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        return;
+    }
+
+    /* Extract filename for display */
+    strncpy(ir_file_name, f_info->file_name, sizeof(ir_file_name) - 1);
+    ir_file_name[sizeof(ir_file_name) - 1] = '\0';
+    /* Remove extension */
+    char *dot = strrchr(ir_file_name, '.');
+    if (dot) *dot = '\0';
+
+    ir_file_draw(cmd_idx, 0);
+
+    while (1)
+    {
+        ret = xQueueReceive(main_q_hdl, &q_item, portMAX_DELAY);
+        if (ret != pdTRUE) continue;
+
+        if (q_item.q_evt_type == Q_EVENT_KEYPAD)
+        {
+            ret = xQueueReceive(button_events_q_hdl, &this_button_status, 0);
+            if (ret != pdTRUE) continue;
+
+            if (this_button_status.event[BUTTON_BACK_KP_ID] == BUTTON_EVENT_CLICK)
+            {
+                if (ir_tx_active)
+                {
+                    if (ir_ota_data_tx_active)
+                        m1_ir_ota_frame_post_process(0xFF);
+                    infrared_encode_sys_deinit();
+                    ir_tx_active = 0;
+                }
+                xQueueReset(main_q_hdl);
+                return;
+            }
+
+            if (this_button_status.event[BUTTON_UP_KP_ID] == BUTTON_EVENT_CLICK)
+            {
+                cmd_idx = (cmd_idx == 0) ? (ir_file_cmd_count - 1) : (cmd_idx - 1);
+                ir_file_draw(cmd_idx, 0);
+            }
+
+            if (this_button_status.event[BUTTON_DOWN_KP_ID] == BUTTON_EVENT_CLICK)
+            {
+                cmd_idx = (cmd_idx + 1) % ir_file_cmd_count;
+                ir_file_draw(cmd_idx, 0);
+            }
+
+            if (this_button_status.event[BUTTON_OK_KP_ID] == BUTTON_EVENT_CLICK)
+            {
+                ir_file_cmd_t *cmd = &ir_file_cmds[cmd_idx];
+
+                ir_file_draw(cmd_idx, 1);
+
+                irmp_data.protocol = cmd->protocol;
+                irmp_data.address  = cmd->address;
+                irmp_data.command  = cmd->command;
+                irmp_data.flags    = 1;
+
+                if (!ir_tx_active)
+                {
+                    infrared_encode_sys_init();
+                    ir_tx_active = 1;
+                }
+                else
+                {
+                    irsnd_init(&Timerhdl_IrCarrier, IR_ENCODE_TIMER_TX_CHANNEL);
+                    vTaskDelay(20);
+                }
+
+                irsnd_generate_tx_data(irmp_data);
+                infrared_transmit(1);
+
+                m1_led_fast_blink(LED_BLINK_ON_RGB, LED_FASTBLINK_PWM_M, LED_FASTBLINK_ONTIME_M);
+                m1_buzzer_notification();
+
+                while (1)
+                {
+                    S_M1_IR_Tx_States tx_state = infrared_transmit(0);
+                    if (tx_state == IR_TX_COMPLETED)
+                    {
+                        m1_led_fast_blink(LED_BLINK_ON_RGB, LED_FASTBLINK_PWM_OFF, LED_FASTBLINK_ONTIME_OFF);
+                        break;
+                    }
+                    if (tx_state == IR_TX_ACTIVE)
+                    {
+                        ret = xQueueReceive(main_q_hdl, &q_item, pdMS_TO_TICKS(2000));
+                        if (ret == pdTRUE && q_item.q_evt_type == Q_EVENT_IRRED_TX)
+                            continue;
+                        if (ret != pdTRUE)
+                        {
+                            m1_led_fast_blink(LED_BLINK_ON_RGB, LED_FASTBLINK_PWM_OFF, LED_FASTBLINK_ONTIME_OFF);
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        ret = xQueueReceive(main_q_hdl, &q_item, pdMS_TO_TICKS(500));
+                        if (ret == pdTRUE && q_item.q_evt_type == Q_EVENT_IRRED_TX)
+                            continue;
+                        break;
+                    }
+                }
+
+                ir_file_draw(cmd_idx, 0);
+            }
+        }
+        else if (q_item.q_evt_type == Q_EVENT_IRRED_TX)
+        {
+            /* Stale TX completion */
+        }
+    }
+}
+static void ir_builtin_remote_run(void)
 {
     S_M1_Buttons_Status this_button_status;
     S_M1_Main_Q_t q_item;
@@ -710,9 +1080,95 @@ void infrared_universal_remotes(void)
         }
     }
 
+} // static void ir_builtin_remote_run(void)
+
+void infrared_universal_remotes(void)
+{
+    S_M1_Buttons_Status this_button_status;
+    S_M1_Main_Q_t q_item;
+    BaseType_t ret;
+    uint8_t sel = 0;
+    uint8_t needs_redraw = 1;
+
+    static const char *ur_menu[] = {"Built-in Remotes", "Load .ir File"};
+
+    while (1)
+    {
+        if (needs_redraw)
+        {
+            needs_redraw = 0;
+            u8g2_FirstPage(&m1_u8g2);
+            u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_TXT);
+            u8g2_SetFont(&m1_u8g2, M1_DISP_MAIN_MENU_FONT_N);
+            u8g2_DrawStr(&m1_u8g2, 1, 10, "Universal Remote");
+            u8g2_SetFont(&m1_u8g2, M1_DISP_SUB_MENU_FONT_N);
+            for (uint8_t i = 0; i < 2; i++)
+            {
+                uint8_t y = 26 + i * 14;
+                if (i == sel) {
+                    u8g2_DrawBox(&m1_u8g2, 0, y - 10, 128, 12);
+                    u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_BG);
+                    u8g2_SetFont(&m1_u8g2, M1_DISP_SUB_MENU_FONT_B);
+                    u8g2_DrawStr(&m1_u8g2, 4, y, ur_menu[i]);
+                    u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_TXT);
+                    u8g2_SetFont(&m1_u8g2, M1_DISP_SUB_MENU_FONT_N);
+                } else {
+                    u8g2_DrawStr(&m1_u8g2, 4, y, ur_menu[i]);
+                }
+            }
+            m1_u8g2_nextpage();
+        }
+
+        ret = xQueueReceive(main_q_hdl, &q_item, portMAX_DELAY);
+        if (ret != pdTRUE) continue;
+        if (q_item.q_evt_type != Q_EVENT_KEYPAD) continue;
+
+        ret = xQueueReceive(button_events_q_hdl, &this_button_status, 0);
+        if (ret != pdTRUE) continue;
+
+        if (this_button_status.event[BUTTON_BACK_KP_ID] == BUTTON_EVENT_CLICK)
+        {
+            xQueueReset(main_q_hdl);
+            break;
+        }
+        if (this_button_status.event[BUTTON_UP_KP_ID] == BUTTON_EVENT_CLICK)
+        {
+            sel = (sel == 0) ? 1 : 0;
+            needs_redraw = 1;
+        }
+        if (this_button_status.event[BUTTON_DOWN_KP_ID] == BUTTON_EVENT_CLICK)
+        {
+            sel = (sel == 0) ? 1 : 0;
+            needs_redraw = 1;
+        }
+        if (this_button_status.event[BUTTON_OK_KP_ID] == BUTTON_EVENT_CLICK)
+        {
+            if (sel == 0)
+            {
+                /* Built-in remotes */
+                ir_builtin_remote_run();
+                needs_redraw = 1;
+            }
+            else
+            {
+                /* Load .ir file from SD */
+                S_M1_file_info *f_info = storage_browse();
+                if (f_info && f_info->file_is_selected)
+                {
+                    char filepath[128];
+                    /* Check if dir_name ends with / to avoid double slash */
+                    int dlen = strlen(f_info->dir_name);
+                    if (dlen > 0 && f_info->dir_name[dlen-1] == '/')
+                        snprintf(filepath, sizeof(filepath), "%s%s", f_info->dir_name, f_info->file_name);
+                    else
+                        snprintf(filepath, sizeof(filepath), "%s/%s", f_info->dir_name, f_info->file_name);
+                    ir_file_remote_run(f_info);
+                }
+                needs_redraw = 1;
+            }
+        }
+    }
 } // void infrared_universal_remotes(void)
-
-
 
 /*============================================================================*/
 /**

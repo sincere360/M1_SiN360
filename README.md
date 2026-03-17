@@ -19,6 +19,11 @@ Forked from the original Monstatek M1 firmware (v0.8) with completed feature stu
   - **Brute Force FC** -- Cycle H10301 facility codes 0-255 with progress bar, pause/resume
 - **IR Universal Remote** -- Built-in database with 15 TV brands (Samsung, LG, Sony, Philips, Panasonic, Vizio, TCL/Roku, Hisense, Toshiba, Sharp, Insignia, Sanyo, Magnavox, and 2 generic NEC profiles), 8-14 commands per brand
 - **Switch Bank** -- Swap between two firmware banks from Settings menu with confirmation screen, enabling dual-firmware setups with other community developers
+- **IR File Loader** -- Load Flipper-compatible .ir files from SD card, browse and transmit any command. Supports NEC, Samsung32, Samsung48, RC5, RC6, SIRCS, Kaseikyo, Denon/Sharp, JVC, BOSE, LG protocols
+- **NFC Cyborg Detector** -- Continuous NFC field to illuminate body implant LEDs
+- **NFC Mifare Fuzzer** -- Cycles sequential UIDs emulating Mifare Classic 1K to test reader responses
+- **NFC Write URL** -- Write custom URLs as NDEF to NTAG tags (NFC business cards)
+- **NFC Utils** -- Write UID to magic cards, Wipe T2T tags
 
 ### Build System Fixes
 - **Fixed CRC generation** -- Replaced broken srec_cat CRC with correct STM32 hardware CRC32 append via Python script
