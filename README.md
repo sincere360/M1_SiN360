@@ -30,6 +30,9 @@ Forked from the original Monstatek M1 firmware (v0.8) with completed feature stu
 - **SD card updates now work reliably** -- Users with original firmware can update via SD card without CRC failures
 - **Clean build output** -- Single firmware binary with correct naming
 
+### Compatibility Fixes
+- **SPI handshake race condition fix** -- Prevents deadlock when using third-party ESP32 firmware such as Bad-BT. Backward compatible with stock ESP32 firmware (credit: cd3daddy)
+
 ### Boot Screen
 - Shows "SiN360" branding below version number
 
