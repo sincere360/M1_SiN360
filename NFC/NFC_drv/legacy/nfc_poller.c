@@ -125,6 +125,7 @@ static void PollerNotif( rfalNfcState st );
 static void m1_t2t_read_ntag(const rfalNfcDevice *dev);
 static ReturnCode GetVersion_Ntag(uint8_t *rxBuf, uint16_t rxBufLen, uint16_t *rcvLen);
 static uint16_t LogParsedNtagVersion(const uint8_t *version, uint16_t len);
+static ReturnCode PwdAuth_Ntag(const uint8_t pwd[4], uint8_t pack[2]);
 
 /*------------------------------------------------------------------------------------------*/
 #define SET_FAMILY(fmt, ...)  do { snprintf(NFC_Family, sizeof(NFC_Family), fmt, ##__VA_ARGS__); } while(0)
@@ -625,6 +626,38 @@ static ReturnCode GetVersion_Ntag(uint8_t *rxBuf, uint16_t rxBufLen, uint16_t *r
 
 /*============================================================================*/
 /**
+ * @brief PwdAuth_Ntag - Send PWD_AUTH (0x1B) to unlock protected pages
+ *
+ * @param[in]  pwd  4-byte password
+ * @param[out] pack 2-byte PACK response
+ * @retval RFAL_ERR_NONE  Success
+ * @retval Other          RFAL error
+ */
+/*============================================================================*/
+static ReturnCode PwdAuth_Ntag(const uint8_t pwd[4], uint8_t pack[2])
+{
+    uint8_t  cmd[5];
+    uint8_t  rxBuf[2];
+    uint16_t rcvLen = 0;
+
+    cmd[0] = 0x1B;
+    memcpy(&cmd[1], pwd, 4);
+
+    ReturnCode err = rfalTransceiveBlockingTxRx(
+        cmd, sizeof(cmd),
+        rxBuf, sizeof(rxBuf), &rcvLen,
+        RFAL_TXRX_FLAGS_DEFAULT, rfalConvMsTo1fc(5U));
+
+    if (err == RFAL_ERR_NONE && rcvLen >= 2 && pack != NULL) {
+        pack[0] = rxBuf[0];
+        pack[1] = rxBuf[1];
+    }
+    return err;
+}
+
+
+/*============================================================================*/
+/**
  * @brief LogParsedNtagVersion - Parse and log NTAG version information
  * 
  * Parses NTAG GET_VERSION response (8 bytes) and logs detailed version information
@@ -841,6 +874,47 @@ static void m1_t2t_read_ntag(const rfalNfcDevice *dev)
     }
 
     osDelay(5);
+
+    /* ---- Amiibo PWD_AUTH: unlock & re-read protected pages ----
+     * NTAG215 has 135 pages; pages 130-134 are password-protected on Amiibo.
+     * Compute password from UID, authenticate, re-read those pages. */
+    {
+        nfc_run_ctx_t *ctx = nfc_ctx_get();
+        if (ctx->head.uid_len == 7 && max_page >= 135) {
+            uint8_t pwd[4], pack[2] = {0};
+            nfc_amiibo_calc_pwd(ctx->head.uid, pwd);
+
+            ReturnCode pwdErr = PwdAuth_Ntag(pwd, pack);
+            if (pwdErr == RFAL_ERR_NONE) {
+                platformLog("PWD_AUTH OK, PACK=%02X%02X\r\n", pack[0], pack[1]);
+
+                /* Re-read pages 130-134 */
+                for (uint8_t blk = 130; blk < 135; blk += 4) {
+                    uint8_t rbuf[16];
+                    uint16_t rl = 0;
+                    ReturnCode re = rfalT2TPollerRead(blk, rbuf, sizeof(rbuf), &rl);
+                    if (re == RFAL_ERR_NONE && rl >= 16) {
+                        uint8_t pages_left = (135 - blk > 4) ? 4 : (135 - blk);
+                        for (uint8_t i = 0; i < pages_left; i++) {
+                            uint16_t soff = (blk + i) * 4;
+                            if (soff + 4 <= dumpSize) {
+                                memcpy(&dump[soff], &rbuf[i * 4], 4);
+                            }
+                        }
+                    }
+                }
+
+                /* Store PACK in page 134 (bytes 0-1) */
+                uint16_t poff = 134 * 4;
+                if (poff + 2 <= dumpSize) {
+                    dump[poff]     = pack[0];
+                    dump[poff + 1] = pack[1];
+                }
+            } else {
+                platformLog("PWD_AUTH skip: err=%d (not Amiibo?)\r\n", pwdErr);
+            }
+        }
+    }
 
     // Actual dump length and page count
     uint16_t dump_len  = offset;

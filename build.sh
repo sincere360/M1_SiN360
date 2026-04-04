@@ -3,7 +3,7 @@ set -e
 
 BUILD_DIR="build"
 OUTPUT_DIR="artifacts"
-FW_NAME="M1_SiN360_v0.9.0.4"
+FW_NAME="M1_SiN360_v0.9.0.5"
 mkdir -p $BUILD_DIR $OUTPUT_DIR
 
 echo "Configuring CMake..."
@@ -15,7 +15,7 @@ echo "Compiling..."
 cmake --build $BUILD_DIR --parallel $(nproc)
 
 # Find the raw bin (without CRC)
-RAW_BIN=$(ls $BUILD_DIR/MonstaTek*.bin 2>/dev/null | grep -v wCRC | head -1)
+RAW_BIN=$(ls $BUILD_DIR/M1_SiN360*.bin $BUILD_DIR/MonstaTek*.bin 2>/dev/null | grep -v wCRC | grep -v _SD | head -1)
 if [ -z "$RAW_BIN" ]; then
     echo "Error: No raw .bin found in $BUILD_DIR"
     exit 1

@@ -315,6 +315,17 @@ void nfc_ctx_set_t2t_version(const uint8_t *ver, uint8_t len);
 uint8_t nfc_ctx_get_t2t_version(uint8_t out[8]);
 
 /**
+ * @brief nfc_ctx_set_t2t_signature - Set T2T ECC signature (up to 32 bytes)
+ */
+void nfc_ctx_set_t2t_signature(const uint8_t *sig, uint8_t len);
+
+/**
+ * @brief nfc_ctx_get_t2t_signature - Get T2T ECC signature
+ * @retval Number of bytes copied, or 0 if not set
+ */
+uint8_t nfc_ctx_get_t2t_signature(uint8_t out[32]);
+
+/**
  * @brief nfc_ctx_set_t2t_page - Set T2T page data
  * 
  * @param[in] page Page number to write
@@ -323,5 +334,21 @@ uint8_t nfc_ctx_get_t2t_version(uint8_t out[8]);
  */
 void nfc_ctx_set_t2t_page(uint16_t page, const uint8_t data[4]);
 
+/**
+ * @brief nfc_amiibo_calc_pwd - Compute Amiibo PWD_AUTH password from 7-byte UID
+ *
+ * @param[in]  uid7  7-byte UID (uid[0]..uid[6])
+ * @param[out] pwd   4-byte password output
+ */
+void nfc_amiibo_calc_pwd(const uint8_t uid7[7], uint8_t pwd[4]);
+
+/**
+ * @brief nfc_amiibo_check_pwd - Check if received password matches computed Amiibo password
+ *
+ * @param[in] rx_pwd  4-byte password received from reader
+ * @retval true  Password matches
+ * @retval false Password does not match (or UID not 7 bytes)
+ */
+bool nfc_amiibo_check_pwd(const uint8_t rx_pwd[4]);
 
 #endif /* NFC_DRV_NFC_CTX_H_ */

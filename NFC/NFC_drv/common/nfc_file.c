@@ -49,13 +49,13 @@ bool nfc_profile_load(const S_M1_file_info *f, const char* ext)
 {
 	char file_path[128];
 	nfc_storage_result_t nfc_ret;
-	//BaseType_t ret;
 
-	if(IsValidFileSpec(f, ext))
+	/* Accept both .nfc and .bin files */
+	if(IsValidFileSpec(f, ext) || IsValidFileSpec(f, "bin"))
 	{
 		fu_path_combine(file_path, sizeof(file_path), f->dir_name, f->file_name);
 
-		// Load file using nfc_storage_load_file
+		// Load file using nfc_storage_load_file (.bin auto-detected inside)
 		nfc_ret = nfc_storage_load_file(file_path, g_nfc_dump_buf, sizeof(g_nfc_dump_buf),
 										g_nfc_valid_bits, sizeof(g_nfc_valid_bits));
 

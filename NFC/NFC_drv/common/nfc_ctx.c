@@ -33,6 +33,8 @@ static inline void nfc_ctx_unlock(void) {}
 /* --------- Internal global variables --------- */
 static uint8_t s_t2t_version[8];
 static uint8_t s_t2t_version_len = 0;
+static uint8_t s_t2t_signature[32];
+static uint8_t s_t2t_signature_len = 0;
 /* --------- Module global context (single instance) --------- */
 static nfc_run_ctx_t g_nfc_ctx;
 
@@ -862,6 +864,27 @@ uint8_t nfc_ctx_get_t2t_version(uint8_t out[8])
 }
 
 /*============================================================================*/
+void nfc_ctx_set_t2t_signature(const uint8_t *sig, uint8_t len)
+{
+    if (!sig || len == 0 || len > 32) {
+        s_t2t_signature_len = 0;
+        return;
+    }
+    memcpy(s_t2t_signature, sig, len);
+    s_t2t_signature_len = len;
+}
+
+/*============================================================================*/
+uint8_t nfc_ctx_get_t2t_signature(uint8_t out[32])
+{
+    if (!out || s_t2t_signature_len == 0) {
+        return 0;
+    }
+    memcpy(out, s_t2t_signature, s_t2t_signature_len);
+    return s_t2t_signature_len;
+}
+
+/*============================================================================*/
 /**
  * @brief nfc_ctx_set_t2t_page - Set T2T page data
  * 
@@ -928,5 +951,25 @@ void nfc_ctx_set_t2t_page(uint16_t page, const uint8_t data[4])
     nfc_ctx_unlock();
 }
 
+
+/*============================================================================*/
+void nfc_amiibo_calc_pwd(const uint8_t uid7[7], uint8_t pwd[4])
+{
+    pwd[0] = 0xAAU ^ uid7[1] ^ uid7[3];
+    pwd[1] = 0x55U ^ uid7[2] ^ uid7[4];
+    pwd[2] = 0xAAU ^ uid7[3] ^ uid7[5];
+    pwd[3] = 0x55U ^ uid7[4] ^ uid7[6];
+}
+
+/*============================================================================*/
+bool nfc_amiibo_check_pwd(const uint8_t rx_pwd[4])
+{
+    nfc_run_ctx_t *c = nfc_ctx_get();
+    if (c->head.uid_len != 7) return false;
+
+    uint8_t expected[4];
+    nfc_amiibo_calc_pwd(c->head.uid, expected);
+    return (memcmp(rx_pwd, expected, 4) == 0);
+}
 
 /* --------- Mifare Classic helpers ---------- */

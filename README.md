@@ -8,9 +8,16 @@ Custom firmware for the Monstatek M1 multi-protocol security research device, bu
 
 Forked from the original Monstatek M1 firmware (v0.8) with completed feature stubs, new tools, and build system fixes.
 
-## What's New in SiN360 v0.9.0.4
+## What's New in SiN360 v0.9.0.5
 
-### Completed Features (formerly stubs)
+### NFC Amiibo Emulation
+- **NTAG215 Amiibo card emulation** -- Emulate Amiibo .nfc and .bin dump files. Tested working with registration and in-game use
+
+> **Note:** Tested and confirmed working on Switch firmware 17.0.1. Firmware 22.0.0 has stricter anti-emulation checks and may not detect emulated tags.
+
+### Previous Release (v0.9.0.4)
+
+#### Completed Features (formerly stubs)
 - **USB-UART Bridge** -- Full runtime CDC mode switching with status screen, transparent bridge operation
 - **Sub-GHz Radio Settings** -- Configurable frequency band (300-915 MHz), modulation (OOK/ASK/FSK), TX power (4 levels)
 - **Sub-GHz Recording** -- Live signal feedback during recording
@@ -94,7 +101,7 @@ python3 append_crc.py firmware_raw.bin firmware_fixed.bin
 
 ## Roadmap
 
-- **Phase 1** (in progress): NFC Tools, Settings menus, Bluetooth config
+- **Phase 1** (in progress): NFC Tools, Amiibo emulation, Settings menus, Bluetooth config
 - **Phase 2**: WiFi attack suite via ESP32-C6 (deauth, beacon spam, evil portal, packet monitor)
 - **Phase 3**: BadUSB HID keyboard with DuckyScript interpreter
 - **Phase 4**: BadUSB over BLE
@@ -118,9 +125,9 @@ See HARDWARE.md for pin mapping and schematic details.
 
 ### Prerequisites
 
-- ARM GCC toolchain (arm-none-eabi-gcc 14.2+)
+- [ARM GCC toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads) (arm-none-eabi-gcc 14.2+) -- must be in PATH
 - CMake 3.22+
-- Ninja build system
+- [Ninja](https://ninja-build.org/) build system
 - Python 3 (for CRC generation)
 
 ### Linux (command line)
@@ -129,15 +136,18 @@ See HARDWARE.md for pin mapping and schematic details.
 make
 ```
 
-Output: ./artifacts/M1_SiN360_v0.9.0.1.bin (SD card update file with CRC)
+Output: ./artifacts/M1_SiN360_v0.9.0.5.bin (SD card update file with CRC)
 
-### VS Code
+### VS Code (Windows/Linux/macOS)
 
-1. Install extensions: CMake Tools, Cortex-Debug
-2. Configure the project (select gcc-14_2_build-release)
-3. Build via the Build icon
+1. Install all prerequisites above and ensure they are in your PATH
+2. Install VS Code extensions: **CMake Tools**, **Cortex-Debug**
+3. Open the project folder in VS Code
+4. If on Windows, the CMakePresets.json compiler path should work with the default ARM GCC install location. On Linux/macOS, update the compiler paths in CMakePresets.json to match your install, or remove them to use PATH
+5. CMake Tools: select the **gcc-14_2_build-release** preset
+6. Build via the CMake Build button (or `Ctrl+Shift+B`)
 
-Output: ./out/build/gcc-14_2_build-release/M1_SiN360_v0.9.0.1_SD.bin
+Output: ./out/build/gcc-14_2_build-release/M1_SiN360_v0.9.0.5_SD.bin
 
 ### STM32CubeIDE
 
@@ -153,12 +163,12 @@ Connect ST-Link V2 to the M1 GPIO header:
 - Pin 8 or 18 (GND) -> GND
 
 ```
-st-flash write M1_SiN360_v0.9.0.1.bin 0x08000000
+st-flash write M1_SiN360_v0.9.0.5.bin 0x08000000
 ```
 
 ### Via SD Card (recommended for users)
 
-1. Copy M1_SiN360_v0.9.0.1.bin to your M1's SD card
+1. Copy M1_SiN360_v0.9.0.5.bin to your M1's SD card
 2. On the M1: Settings > Firmware Update
 3. Browse to the file and select it
 4. Wait for "UPDATE COMPLETED" and reboot
