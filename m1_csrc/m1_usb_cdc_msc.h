@@ -95,4 +95,3 @@ uint8_t m1_usb_msc_process(void);
 uint8_t m1_usb_msc_sd_detected(void);
 
 #endif /* M1_USB_CDC_MSC_H_ */
-

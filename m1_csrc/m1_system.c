@@ -20,6 +20,7 @@
 #include "app_freertos.h"
 #include "m1_tasks.h"
 #include "m1_power_ctl.h"
+#include "m1_settings.h"
 #include "m1_fw_update_bl.h"
 #include "m1_lp5814.h"
 #include "battery.h"

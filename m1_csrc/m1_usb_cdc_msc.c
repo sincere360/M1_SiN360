@@ -971,4 +971,3 @@ void HAL_PCD_MspDeInit(PCD_HandleTypeDef* hpcd)
   }
 } // void HAL_PCD_MspDeInit(PCD_HandleTypeDef* hpcd)
 
-

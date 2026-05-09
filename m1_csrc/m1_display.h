@@ -115,6 +115,8 @@ extern const uint8_t menu_m1_icon_rfid[];
 extern const uint8_t menu_m1_icon_wave[];
 extern const uint8_t menu_m1_icon_setting[];
 extern const uint8_t menu_m1_icon_wifi[];
+extern const uint8_t menu_m1_icon_apps[];
+extern const uint8_t menu_m1_icon_badusb[];
 extern const uint8_t menu_m1_icon_M1_logo_1[];
 extern const uint8_t m1_menu_logo[];
 extern const uint8_t m1_boot_logo[];

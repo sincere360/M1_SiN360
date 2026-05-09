@@ -337,6 +337,8 @@ target_sources(m1_01 INTERFACE
     ../../m1_csrc/res_string.c
     ../../m1_csrc/bit_util.c
     ../../m1_csrc/logger.c
+    ../../m1_csrc/m1_apps.c
+    ../../m1_csrc/m1_badusb.c
     ../../m1_csrc/m1_bq25896.c
     ../../m1_csrc/m1_bq27421.c
     ../../m1_csrc/m1_bt.c
@@ -398,4 +400,3 @@ target_link_libraries(m1_01 INTERFACE
 if(CMAKE_C_STANDARD LESS 11)
     message(ERROR "Generated code requires C11 or higher")
 endif()
-

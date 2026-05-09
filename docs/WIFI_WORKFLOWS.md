@@ -4,8 +4,8 @@ Use these workflows in a controlled lab with networks and clients you own or hav
 
 ## Firmware Pairing
 
-1. Flash the STM32 `M1_SiN360_v0.9.0.9_SD.bin`.
-2. Flash a compatible ESP32-C6 firmware. ESP32 `v0.9.0.9` is compatible with this STM32 release.
+1. Flash the STM32 `M1_SiN360_v0.9.1.0_SD.bin`.
+2. Flash a compatible ESP32-C6 firmware. ESP32 `v0.9.1.0` is compatible with this STM32 release.
 3. Reboot the M1 after firmware updates.
 
 STM32 and ESP32 firmware need compatible WiFi/BLE commands because they use a shared binary SPI protocol.

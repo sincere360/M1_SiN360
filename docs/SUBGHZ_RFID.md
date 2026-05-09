@@ -134,3 +134,62 @@ Gallagher and Electra currently save, write, and emulate raw frames. They work a
 - Test RFID write/emulate with expendable T5577 tags first.
 - PSK/direct protocols may need more antenna and timing validation.
 - For Sub-GHz custom frequencies, verify output with a spectrum analyzer, SDR, or VNA-assisted setup before relying on a new frequency range.
+
+## Sub-GHz Workflows
+
+### RSSI And Frequency Check
+
+1. Open `Sub-GHz > RSSI Meter`.
+2. Trigger a known test transmitter nearby.
+3. Watch the live RSSI and peak value.
+4. Open `Sub-GHz > Frequency Scanner`.
+5. Sweep the expected band.
+
+Expected result: the RSSI meter reacts to nearby transmitters and the scanner finds activity near the expected frequency.
+
+### Custom Frequency
+
+1. Open `Sub-GHz > Radio Settings > Frequency`.
+2. Enter an exact frequency between `300.000` and `928.000` MHz.
+3. Return to RX or record mode.
+4. Verify the active frequency on-device and with external RF test gear when available.
+
+Expected result: the chosen frequency is applied directly instead of snapping to a preset.
+
+### Playlist Player
+
+1. Put `.sub` files on the SD card.
+2. Put a playlist `.txt` under the Sub-GHz playlist folder.
+3. Add one `.sub` path per line.
+4. Open the playlist player and select the file.
+5. Set the repeat count and run the playlist.
+
+Expected result: each listed `.sub` file is transmitted in order, with progress shown on the display.
+
+## RFID Workflows
+
+### Read And Save
+
+1. Open `125 kHz RFID > Read`.
+2. Hold a known compatible card near the LF antenna.
+3. Save the card after a successful read.
+
+Expected result: the protocol and decoded card data are shown, then saved to SD card.
+
+### Clone To T5577
+
+1. Read or load a compatible LF card.
+2. Use a blank expendable T5577 test tag.
+3. Start the clone/write flow.
+4. Read the T5577 back after writing.
+
+Expected result: the cloned tag reads back as the selected protocol when the protocol and T5577 modulation support the write.
+
+### Emulate Saved Card
+
+1. Load a saved RFID card file.
+2. Start emulate.
+3. Test against a lab reader.
+4. Press `BACK` to stop.
+
+Expected result: the M1 emits the saved LF format while emulate is running.

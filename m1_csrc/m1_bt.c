@@ -103,7 +103,7 @@ typedef struct {
 static ble_dev_t *ble_list = NULL;
 static uint16_t ble_count = 0;
 static uint16_t ble_view_idx = 0;
-static char ble_adv_name[BLE_ADV_NAME_MAX + 1] = "SiN360-M1";
+static char ble_adv_name[BLE_ADV_NAME_MAX + 1] = "M1";
 static bool ble_adv_name_loaded = false;
 static ble_raw_entry_t ble_raw_list[BLE_DEV_MAX];
 static ble_gatt_entry_t ble_gatt_list[BLE_GATT_MAX];
@@ -237,7 +237,7 @@ static void ble_adv_name_save(void)
     f_close(&fil);
 }
 
-static const char *ble_adv_name_get(void)
+const char *ble_adv_name_get(void)
 {
     ble_adv_name_load();
     return ble_adv_name;

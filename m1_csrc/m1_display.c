@@ -183,10 +183,17 @@ void m1_gui_menu_update(const S_M1_Menu_t *phmenu, uint8_t sel_item, uint8_t dir
 	uint8_t n_items, run;
 	const char *psubmenu[SUB_MENU_ITEMS_MAX];
 
+	if (phmenu == NULL)
+		return;
+
 	if ( direction==MENU_UPDATE_INIT )
 		menu_level = 0;
 	this_gui_menu = phmenu;
 	n_items = phmenu->num_submenu_items;
+	if (n_items > SUB_MENU_ITEMS_MAX)
+	{
+		n_items = SUB_MENU_ITEMS_MAX;
+	}
 
 	if ( phmenu->gui_menu_update ) // This menu item has its own gui update function?
 	{
@@ -195,25 +202,28 @@ void m1_gui_menu_update(const S_M1_Menu_t *phmenu, uint8_t sel_item, uint8_t dir
 		{
 			menu_display[menu_level].disp_top_row = disp_window_top_row;
 			menu_display[menu_level].active_disp_row = disp_window_active_row; // back up
-			menu_level++;
+			if (menu_level < (SUB_MENU_LEVEL_MAX - 1U))
+				menu_level++;
 		}
 		return;
 	} // if ( phmenu->gui_menu_update )
 
 	if ( direction==MENU_UPDATE_RESET ) // Sub-menu is changed
 	{
-		menu_level++;
+		if (menu_level < (SUB_MENU_LEVEL_MAX - 1U))
+			menu_level++;
 	} // if ( direction==MENU_UPDATE_RESET )
 	else if ( direction==MENU_UPDATE_RESTORE )
 	{
-		menu_level--;
+		if (menu_level)
+			menu_level--;
 		// Restore previous display values
 		disp_window_top_row = menu_display[menu_level].disp_top_row;
 		disp_window_active_row = menu_display[menu_level].active_disp_row;
 	} // else if ( direction==MENU_UPDATE_RESTORE )
 	for (run=0; run<n_items; run++)
 	{
-		psubmenu[run] = phmenu->submenu[run]->title;
+		psubmenu[run] = (phmenu->submenu[run] != NULL) ? phmenu->submenu[run]->title : "";
 	}
 	menu_level_id = (menu_level==0)?0:1;
 	m1_gui_submenu_update(psubmenu, n_items, sel_item, direction);
@@ -239,8 +249,11 @@ uint8_t m1_gui_submenu_update(const char *phmenu[], uint8_t num_items, uint8_t s
 	uint8_t menu_text_y, menu_frame_y;
 	uint8_t disp_window_bottom_row;
 	uint8_t n_items, active_item, run;
+	uint8_t window_items, max_top_row, max_active_row;
 
 	n_items = num_items;
+	if (n_items > SUB_MENU_ITEMS_MAX)
+		n_items = SUB_MENU_ITEMS_MAX;
 
 	switch ( direction )
 	{
@@ -399,6 +412,32 @@ uint8_t m1_gui_submenu_update(const char *phmenu[], uint8_t num_items, uint8_t s
 			break;
 	} // switch ( direction )
 
+	if (n_items == 0 || phmenu == NULL)
+		return sel_item;
+
+	if (sel_item >= n_items)
+		sel_item = 0;
+
+	if (disp_window_top_row == 0)
+		disp_window_top_row = 1;
+	if (disp_window_active_row == 0)
+		disp_window_active_row = 1;
+
+	window_items = menu_window_sizes[menu_level_id];
+	if (window_items == 0)
+		return sel_item;
+
+	if (n_items >= window_items)
+		max_top_row = n_items - (window_items - 1U);
+	else
+		max_top_row = 1U;
+	if (disp_window_top_row > max_top_row)
+		disp_window_top_row = max_top_row;
+
+	max_active_row = (n_items >= window_items) ? window_items : n_items;
+	if (disp_window_active_row > max_active_row)
+		disp_window_active_row = max_active_row;
+
 	/* Graphic work starts here */
     u8g2_FirstPage(&m1_u8g2); // This call required for page drawing in mode 1
 	u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_TXT);
@@ -439,7 +478,12 @@ uint8_t m1_gui_submenu_update(const char *phmenu[], uint8_t num_items, uint8_t s
 		if ( menu_level_id==0 )
 		{
 			// Draw icons for main menu items
-			u8g2_DrawXBMP(&m1_u8g2, MAIN_MENU_ICON_LEFT_POS_X, menu_frame_y + 1, MAIN_MENU_ICON_WIDTH, MAIN_MENU_ICON_HEIGHT, this_gui_menu->submenu[run - 1]->icon_ptr);
+			const S_M1_Menu_t *item = this_gui_menu->submenu[run - 1];
+			if (item != NULL && item->icon_ptr != NULL)
+			{
+				u8g2_DrawXBMP(&m1_u8g2, MAIN_MENU_ICON_LEFT_POS_X, menu_frame_y + 1,
+							  MAIN_MENU_ICON_WIDTH, MAIN_MENU_ICON_HEIGHT, item->icon_ptr);
+			}
 		}
 		menu_frame_y += menu_text_frame_h[menu_level_id];
 		menu_text_y += menu_text_spacing_vert[menu_level_id];

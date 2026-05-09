@@ -32,47 +32,38 @@
 #define USBD_PID                      0x5750
 #define USBD_LANGID_STRING            0x409
 
-#define USBD_MANUFACTURER_STRING      "STMicroelectronics"
-#if 0
-#define USBD_PRODUCT_HS_STRING        "Composite_MSC_CDC in HS Mode"
-#define USBD_PRODUCT_FS_STRING        "Composite_MSC_CDC in FS Mode"
-#define USBD_CONFIGURATION_HS_STRING  "Composite_MSC_CDC Config"
-#define USBD_INTERFACE_HS_STRING      "Composite_MSC_CDC Interface"
-#define USBD_CONFIGURATION_FS_STRING  "Composite_MSC_CDC Config"
-#define USBD_INTERFACE_FS_STRING      "Composite_MSC_CDC Interface"
-#else
-#define USBD_PRODUCT_HS_STRING        "MTEKM1_MSC_CDC HS"
-#define USBD_PRODUCT_FS_STRING        "MTEKM1_MSC_CDC FS"
-#define USBD_CONFIGURATION_HS_STRING  "MTEKM1_MSC_CDC HS Config"
-#define USBD_INTERFACE_HS_STRING      "MTEKM1_MSC_CDC HS"
-#define USBD_CONFIGURATION_FS_STRING  "MTEKM1_MSC_CDC FS Config"
-#define USBD_INTERFACE_FS_STRING      "MTEKM1_MSC_CDC FS"
-#endif // #if 0
+#define USBD_MANUFACTURER_STRING      "M-USB"
+#define USBD_PRODUCT_HS_STRING        "Composite Device"
+#define USBD_PRODUCT_FS_STRING        "Composite Device"
+#define USBD_CONFIGURATION_HS_STRING  "Composite Device"
+#define USBD_INTERFACE_HS_STRING      "Storage Serial HID"
+#define USBD_CONFIGURATION_FS_STRING  "Composite Device"
+#define USBD_INTERFACE_FS_STRING      "Storage Serial HID"
 #elif (M1_USB_MODE == M1_CFG_USB_MSC)
 
 #define USBD_VID                      0x0483
 #define USBD_PID                      0x572A /* Replace '0xaaaa' with your device product ID */
 #define USBD_LANGID_STRING            0x409
-#define USBD_MANUFACTURER_STRING      "STMicroelectronics" /* Add your manufacturer string */
-#define USBD_PRODUCT_HS_STRING        "STM32 Mass Storage" /* Add your product Full Speed string */
-#define USBD_CONFIGURATION_HS_STRING  "MSC Config" /* Add your configuration Full Speed string */
-#define USBD_INTERFACE_HS_STRING      "MSC Interface" /* Add your Interface Full Speed string */
-#define USBD_PRODUCT_FS_STRING        "STM32 Mass Storage" /* Add your product Full Speed string */
-#define USBD_CONFIGURATION_FS_STRING  "MSC Config" /* Add your configuration Full Speed string */
-#define USBD_INTERFACE_FS_STRING      "MSC Interface" /* Add your Interface Full Speed string */
+#define USBD_MANUFACTURER_STRING      "SiN360"
+#define USBD_PRODUCT_HS_STRING        "SiN360 M1 Storage"
+#define USBD_CONFIGURATION_HS_STRING  "M1 Storage"
+#define USBD_INTERFACE_HS_STRING      "M1 Storage"
+#define USBD_PRODUCT_FS_STRING        "SiN360 M1 Storage"
+#define USBD_CONFIGURATION_FS_STRING  "M1 Storage"
+#define USBD_INTERFACE_FS_STRING      "M1 Storage"
 
 #elif (M1_USB_MODE == M1_CFG_USB_CDC)
 
 #define USBD_VID                      0x0483
 #define USBD_PID                      0x5740 /* Replace '0xaaaa' with your device product ID */
 #define USBD_LANGID_STRING            0x409
-#define USBD_MANUFACTURER_STRING      "STMicroelectronics" /* Add your manufacturer string */
-#define USBD_PRODUCT_HS_STRING        "STM32 Virtual ComPort" /* Add your product Full Speed string */
-#define USBD_CONFIGURATION_HS_STRING  "CDC Config" /* Add your configuration Full Speed string */
-#define USBD_INTERFACE_HS_STRING      "CDC Interface" /* Add your Interface Full Speed string */
-#define USBD_PRODUCT_FS_STRING        "STM32 Virtual ComPort" /* Add your product Full Speed string */
-#define USBD_CONFIGURATION_FS_STRING  "CDC Config" /* Add your configuration Full Speed string */
-#define USBD_INTERFACE_FS_STRING      "CDC Interface" /* Add your Interface Full Speed string */
+#define USBD_MANUFACTURER_STRING      "SiN360"
+#define USBD_PRODUCT_HS_STRING        "SiN360 M1 Serial"
+#define USBD_CONFIGURATION_HS_STRING  "M1 Serial"
+#define USBD_INTERFACE_HS_STRING      "M1 Serial"
+#define USBD_PRODUCT_FS_STRING        "SiN360 M1 Serial"
+#define USBD_CONFIGURATION_FS_STRING  "M1 Serial"
+#define USBD_INTERFACE_FS_STRING      "M1 Serial"
 
 #endif
 

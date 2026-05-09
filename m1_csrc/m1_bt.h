@@ -15,6 +15,7 @@
 
 void menu_bluetooth_init(void);
 void bluetooth_config(void);
+const char *ble_adv_name_get(void);
 void bluetooth_scan(void);
 void bluetooth_advertise(void);
 void ble_sniff_analyzer(void);

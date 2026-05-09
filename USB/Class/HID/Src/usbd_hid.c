@@ -288,6 +288,7 @@ static uint8_t USBD_HID_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 uint8_t USBD_HID_SendReport(USBD_HandleTypeDef *pdev, uint8_t *report, uint16_t len)
 {
     USBD_HID_HandleTypeDef *hhid;
+    uint8_t ret;
 
 #ifdef USE_USBD_COMPOSITE
     /* Find HID class instance */
@@ -295,12 +296,14 @@ uint8_t USBD_HID_SendReport(USBD_HandleTypeDef *pdev, uint8_t *report, uint16_t 
         if (pdev->tclasslist[i].ClassType == CLASS_TYPE_HID) {
             hhid = (USBD_HID_HandleTypeDef *)pdev->pClassDataCmsit[i];
             if (hhid == NULL) return (uint8_t)USBD_FAIL;
+            if (pdev->dev_state != USBD_STATE_CONFIGURED) return (uint8_t)USBD_FAIL;
+            if (hhid->state != HID_IDLE) return (uint8_t)USBD_BUSY;
 
-            if (pdev->dev_state == USBD_STATE_CONFIGURED) {
-                if (hhid->state == HID_IDLE) {
-                    hhid->state = HID_BUSY;
-                    (void)USBD_LL_Transmit(pdev, pdev->tclasslist[i].Eps[0].add, report, len);
-                }
+            hhid->state = HID_BUSY;
+            ret = USBD_LL_Transmit(pdev, pdev->tclasslist[i].Eps[0].add, report, len);
+            if (ret != (uint8_t)USBD_OK) {
+                hhid->state = HID_IDLE;
+                return ret;
             }
             return (uint8_t)USBD_OK;
         }
@@ -309,12 +312,14 @@ uint8_t USBD_HID_SendReport(USBD_HandleTypeDef *pdev, uint8_t *report, uint16_t 
 #else
     hhid = (USBD_HID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
     if (hhid == NULL) return (uint8_t)USBD_FAIL;
+    if (pdev->dev_state != USBD_STATE_CONFIGURED) return (uint8_t)USBD_FAIL;
+    if (hhid->state != HID_IDLE) return (uint8_t)USBD_BUSY;
 
-    if (pdev->dev_state == USBD_STATE_CONFIGURED) {
-        if (hhid->state == HID_IDLE) {
-            hhid->state = HID_BUSY;
-            (void)USBD_LL_Transmit(pdev, 0x81U, report, len);
-        }
+    hhid->state = HID_BUSY;
+    ret = USBD_LL_Transmit(pdev, 0x81U, report, len);
+    if (ret != (uint8_t)USBD_OK) {
+        hhid->state = HID_IDLE;
+        return ret;
     }
     return (uint8_t)USBD_OK;
 #endif

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
+#include <strings.h>
 #include "stm32h5xx_hal.h"
 #include "main.h"
 #include "m1_nfc.h"
@@ -2625,26 +2627,84 @@ static void nfc_tools_read_ndef_run(void)
 }
 
 /* ==== Write NFC URL: write a URL as NDEF to an NTAG tag ==== */
+static void nfc_tools_trim_text(char *text)
+{
+    char *start;
+    char *end;
+
+    if (!text)
+        return;
+
+    start = text;
+    while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n')
+        start++;
+
+    if (start != text)
+        memmove(text, start, strlen(start) + 1U);
+
+    end = text + strlen(text);
+    while (end > text &&
+           (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n'))
+    {
+        *--end = '\0';
+    }
+}
+
+static void nfc_tools_url_prefix(const char *url, uint8_t *prefix_code,
+                                 const char **uri_text, const char **prefix_text)
+{
+    if (strncasecmp(url, "http://www.", 11) == 0)
+    {
+        *prefix_code = 0x01;
+        *prefix_text = "http://www.";
+        *uri_text = url + 11;
+    }
+    else if (strncasecmp(url, "https://www.", 12) == 0)
+    {
+        *prefix_code = 0x02;
+        *prefix_text = "https://www.";
+        *uri_text = url + 12;
+    }
+    else if (strncasecmp(url, "http://", 7) == 0)
+    {
+        *prefix_code = 0x03;
+        *prefix_text = "http://";
+        *uri_text = url + 7;
+    }
+    else if (strncasecmp(url, "https://", 8) == 0)
+    {
+        *prefix_code = 0x04;
+        *prefix_text = "https://";
+        *uri_text = url + 8;
+    }
+    else
+    {
+        *prefix_code = 0x04;
+        *prefix_text = "https://";
+        *uri_text = url;
+    }
+}
+
 static void nfc_tools_write_url_run(void)
 {
     S_M1_Buttons_Status btn;
     S_M1_Main_Q_t q_item;
     BaseType_t ret;
 
-    /* Pre-built NDEF message for https://github.com/sincere360/M1_SiN360 */
     /* NDEF TLV: 03 <len> <ndef_record> FE */
-    /* Record: D1 01 <payload_len> 55 <uri_prefix=04=https://> <url_text> */
+    /* Record: D1 01 <payload_len> 55 <uri_prefix> <uri_text> */
     char url_text[128];
     char default_url[] = "github.com/sincere360/M1_SiN360";
-    uint8_t vkb_ret = m1_vkb_get_filename("Enter URL (no https://):", default_url, url_text);
+    const char *uri_text;
+    const char *prefix_text;
+    uint8_t uri_prefix;
+    uint8_t vkb_ret = m1_vkb_get_text("Enter URL:", default_url, url_text, sizeof(url_text) - 1);
     if (!vkb_ret) return;
     url_text[sizeof(url_text) - 1U] = '\0';
-    uint16_t url_len = strlen(url_text);
-    if (url_len > (sizeof(url_text) - 1U))
-    {
-        url_len = sizeof(url_text) - 1U;
-        url_text[url_len] = '\0';
-    }
+    nfc_tools_trim_text(url_text);
+    if (url_text[0] == '\0') return;
+    nfc_tools_url_prefix(url_text, &uri_prefix, &uri_text, &prefix_text);
+    uint16_t url_len = strlen(uri_text);
 
     uint16_t ndef_payload_len = 1U + url_len; /* prefix byte + url */
     uint8_t ndef_record[160];
@@ -2662,8 +2722,8 @@ static void nfc_tools_write_url_run(void)
     ndef_record[ndef_total++] = 0x01;               /* Type length = 1 */
     ndef_record[ndef_total++] = (uint8_t)ndef_payload_len; /* Payload length */
     ndef_record[ndef_total++] = 'U';                 /* Type = URI */
-    ndef_record[ndef_total++] = 0x04;               /* URI prefix: https:// */
-    memcpy(&ndef_record[ndef_total], url_text, url_len);
+    ndef_record[ndef_total++] = uri_prefix;
+    memcpy(&ndef_record[ndef_total], uri_text, url_len);
     ndef_total += url_len;
     ndef_record[ndef_total++] = 0xFE;               /* Terminator TLV */
 
@@ -2676,8 +2736,8 @@ static void nfc_tools_write_url_run(void)
     u8g2_SetFont(&m1_u8g2, M1_DISP_RUN_MENU_FONT_B);
     u8g2_DrawStr(&m1_u8g2, 4, 12, "Write NFC URL");
     u8g2_SetFont(&m1_u8g2, M1_DISP_FUNC_MENU_FONT_N);
-    u8g2_DrawStr(&m1_u8g2, 4, 26, "https://");
-    u8g2_DrawStr(&m1_u8g2, 4, 36, url_text);
+    u8g2_DrawStr(&m1_u8g2, 4, 26, prefix_text);
+    u8g2_DrawStr(&m1_u8g2, 4, 36, uri_text);
     u8g2_DrawBox(&m1_u8g2, 0, 52, 128, 12);
     u8g2_SetDrawColor(&m1_u8g2, M1_DISP_DRAW_COLOR_BG);
     u8g2_DrawStr(&m1_u8g2, 2, 61, "OK=Write  Back=Cancel");

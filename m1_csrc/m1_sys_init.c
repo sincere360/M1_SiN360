@@ -195,4 +195,3 @@ void m1_system_init_task(void *param)
 		}
 	} // while (1)
 } // void m1_system_init_task(void *param)
-

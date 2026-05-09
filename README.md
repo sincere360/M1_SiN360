@@ -10,16 +10,16 @@ This project started as a fork of the original Monstatek M1 firmware and adds co
 
 ## Current Release
 
-**SiN360 v0.9.0.9**
+**SiN360 v0.9.1.0**
 
-This release rolls up the latest WiFi, BLE, NFC, Sub-GHz, and LF RFID work. It pairs with the `v0.9.0.9` ESP32-C6 companion firmware for the current WiFi/BLE command set and deauth fix.
+This release rolls up the latest WiFi, BLE, NFC, Sub-GHz, LF RFID, BadUSB/BadBLE, and external app work. It pairs with the `v0.9.1.0` ESP32-C6 companion firmware for the current WiFi/BLE command set and deauth fix.
 
 ### Branding
 
-- Firmware version: `0.9.0.9`
+- Firmware version: `0.9.1.0`
 - Boot screen now uses SiN360 branding with the firmware version underneath
 - Boot and main-menu logos updated with custom monochrome artwork
-- Default BLE advertising name changed to `SiN360-M1`
+- Generic BLE advertising now defaults to `M1`; BadBLE advertises as `Keyboard-XX`
 
 ### ESP32-C6 Companion Firmware
 
@@ -29,15 +29,18 @@ ESP32 firmware repo:
 
 <https://github.com/sincere360/M1_SiN360_ESP32>
 
-Current compatible ESP32 release: `v0.9.0.9`
+Current compatible ESP32 release: `v0.9.1.0`
 
-<https://github.com/sincere360/M1_SiN360_ESP32/releases/tag/v0.9.0.9>
+<https://github.com/sincere360/M1_SiN360_ESP32/releases/tag/v0.9.1.0>
 
 Workflow guides:
 
 - [WiFi Test Workflows](docs/WIFI_WORKFLOWS.md)
 - [Bluetooth / BLE Test Workflows](docs/BLE_WORKFLOWS.md)
 - [Sub-GHz and RFID Features](docs/SUBGHZ_RFID.md)
+- [NFC Workflows](docs/NFC_WORKFLOWS.md)
+- [BadUSB and BadBLE Workflows](docs/BADUSB_BADBLE_WORKFLOWS.md)
+- [External Apps Workflow](docs/APPS_WORKFLOWS.md)
 
 ### WiFi
 
@@ -81,6 +84,8 @@ Workflow guides:
   - Flipper Spam
   - Spam All
 - AirTag-like spoof advertisements
+- BadBLE HID keyboard script runner using the same SD-card scripts as BadUSB
+- BadBLE advertises as `Keyboard-XX` and rotates its BLE address when a run starts
 
 ### UI And Input
 
@@ -88,6 +93,8 @@ Workflow guides:
 - Keyboard supports lowercase, uppercase, numbers, symbols, spaces, backspace, and up to 63-byte WiFi passwords
 - Existing filename keyboard remains for file/path style entry
 - File browser is used for SD-card SSID lists, AP caches, IR files, NFC files, and portal HTML files
+- Apps menu for browsing and launching `.m1app` files from `SD:/apps`
+- `M1-SDK Info` screen points app developers to the external app SDK
 
 ### Sub-GHz, RFID, NFC, And Core Tools
 
@@ -95,11 +102,11 @@ Workflow guides:
 - Sub-GHz RSSI meter, frequency scanner, spectrum analyzer, playlist player, expanded protocol decoding, Princeton add-manually, and Princeton/CAME/Nice FLO/Linear/Holtek brute-force helpers
 - Sub-GHz radio settings for TX power, region check, modulation, and custom frequency
 - 125 kHz RFID read/write/emulate with expanded protocol coverage and T5577 clone/write tools
-- NFC read/write/emulate features, including NTAG215 Amiibo support and improved Type 2 Tag URL writing
+- NFC read/write/emulate features, including NTAG215 Amiibo support and Type 2 Tag URL writing for full or bare URLs
 - NFC utilities: Tag Info, Type 2 page dump, Field Test, Cyborg Detector, Mifare Fuzzer, Write URL, Write Tag, UID write, and T2T wipe
 - Infrared TX/RX, Universal Remote, and Flipper `.ir` file loading
 - GPIO controls
-- USB CDC + MSC composite mode
+- USB CDC + MSC + HID composite mode
 - STM32 firmware update from SD card
 - ESP32 firmware update from SD card
 - Dual-bank firmware switching
@@ -135,7 +142,7 @@ Still in progress:
 - More Evil Portal polish and a dedicated portal authoring document
 - Field tuning for advanced raw WiFi management-frame attacks across more chipsets
 - Field tuning for advanced Sub-GHz/RFID protocols and NFC range-extender behavior
-- BadUSB/HID UI and scripting
+- More BadUSB/BadBLE script commands, preview, pause, and stop controls
 - GPS and other advanced features
 
 ## Hardware
@@ -147,7 +154,7 @@ Still in progress:
 - **LF RFID:** 125 kHz read/write/emulate with T5577 write support for compatible formats
 - **IR:** IRMP/IRSND protocol library
 - **Display:** 128x64 OLED through u8g2
-- **USB:** CDC + MSC composite device
+- **USB:** CDC + MSC + HID composite device
 - **Storage:** SD card through FatFS
 
 See `HARDWARE.md` for pin mapping and schematic details.
@@ -170,7 +177,7 @@ make
 Output:
 
 ```text
-artifacts/M1_SiN360_v0.9.0.9.bin
+artifacts/M1_SiN360_v0.9.1.0.bin
 ```
 
 ### VS Code
@@ -184,7 +191,7 @@ artifacts/M1_SiN360_v0.9.0.9.bin
 Output is normally:
 
 ```text
-out/build/gcc-14_2_build-release/M1_SiN360_v0.9.0.9_SD.bin
+out/build/gcc-14_2_build-release/M1_SiN360_v0.9.1.0_SD.bin
 ```
 
 ## Building ESP32 Firmware
@@ -205,7 +212,7 @@ Copy the ESP32 update files to the SD card, then use **Settings > ESP32 > Firmwa
 
 ### Via SD Card
 
-1. Copy `M1_SiN360_v0.9.0.9_SD.bin` to the M1 SD card.
+1. Copy `M1_SiN360_v0.9.1.0_SD.bin` to the M1 SD card.
 2. On the M1, open **Settings > Firmware Update**.
 3. Select the firmware file.
 4. Wait for the update to complete and reboot.
@@ -219,7 +226,7 @@ Connect ST-Link V2 to the M1 GPIO header:
 - Pin 8 or 18 -> GND
 
 ```bash
-st-flash write M1_SiN360_v0.9.0.9.bin 0x08000000
+st-flash write M1_SiN360_v0.9.1.0.bin 0x08000000
 ```
 
 ## Dual Firmware Banks
@@ -232,6 +239,7 @@ SiN360 supports switching from **Settings > Switch Bank**. A safety fallback is 
 
 - **Monstatek** -- Original M1 hardware and base firmware
 - **neddy299** -- Deauth patch
+- **bedge117** -- `m1-sdk` for external app development
 - **IRMP/IRSND** -- IR protocol library by Frank Meyer
 - **Flipper Zero community** -- IR code database references and inspiration
 

@@ -4,8 +4,8 @@ Use these workflows in a controlled lab with devices you own or have permission 
 
 ## Firmware Pairing
 
-1. Flash the STM32 `M1_SiN360_v0.9.0.9_SD.bin`.
-2. Flash a compatible ESP32-C6 firmware. ESP32 `v0.9.0.9` is compatible with this STM32 release.
+1. Flash the STM32 `M1_SiN360_v0.9.1.0_SD.bin`.
+2. Flash a compatible ESP32-C6 firmware. ESP32 `v0.9.1.0` is compatible with this STM32 release.
 3. Reboot the M1 after firmware updates.
 
 BLE features live on the ESP32-C6, so compatible ESP32 firmware is required.
@@ -54,6 +54,14 @@ You should see: spam screens use the configured interval and random-MAC behavior
 4. Press `BACK` to stop each run.
 
 You should see: packet count increments on accepted advertisements. The error counter increments if the ESP32 rejects a payload or restart. Modern fully updated phones may ignore or silently suppress some spam payloads.
+
+## BadBLE
+
+BadBLE uses the same SD-card script format as BadUSB, but sends keystrokes through an ESP32 BLE HID keyboard connection.
+
+Use the dedicated workflow here:
+
+[BadUSB and BadBLE Workflows](BADUSB_BADBLE_WORKFLOWS.md)
 
 ## BLE Analyzer And Sniffers
 

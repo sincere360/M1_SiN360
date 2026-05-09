@@ -51,6 +51,8 @@
 #define CMD_BLE_GATT_WRITE    0x2B
 #define CMD_BLE_GATT_SUB      0x2C
 #define CMD_BLE_GATT_NOTIF    0x2D
+#define CMD_BLE_HID_START     0x2E
+#define CMD_BLE_HID_STOP      0x2F
 
 /* WiFi attacks */
 #define CMD_DEAUTH_START      0x30
@@ -105,6 +107,8 @@
 #define CMD_NETSCAN_START     0x5C
 #define CMD_NETSCAN_NEXT      0x5D
 #define CMD_NETSCAN_STOP      0x5E
+#define CMD_BLE_HID_REPORT    0x60
+#define CMD_BLE_HID_STATUS    0x61
 
 /* ---- Response status ---- */
 #define RESP_OK    0x00

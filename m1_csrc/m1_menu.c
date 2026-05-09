@@ -30,6 +30,8 @@
 #include "m1_storage.h"
 #include "m1_wifi.h"
 #include "m1_bt.h"
+#include "m1_apps.h"
+#include "m1_badusb.h"
 
 /*************************** D E F I N E S ************************************/
 
@@ -918,11 +920,17 @@ S_M1_Menu_t menu_BLE_Spoof_Airtag =
     "Spoof Airtag", ble_spoof_airtag, NULL, NULL, 0, 0, NULL, NULL, NULL
 };
 
+S_M1_Menu_t menu_BLE_BadBLE =
+{
+    "BadBLE", badble_run_script, NULL, NULL, 0, 0, NULL, NULL, NULL
+};
+
 S_M1_Menu_t menu_BT_Attacks =
 {
-    "Attacks", NULL, NULL, NULL, 7, 0, NULL, NULL,
+    "Attacks", NULL, NULL, NULL, 8, 0, NULL, NULL,
     {&menu_BLE_Sour_Apple, &menu_BLE_Swiftpair, &menu_BLE_Samsung,
-     &menu_BLE_Google, &menu_BLE_Flipper, &menu_BLE_Spam_All, &menu_BLE_Spoof_Airtag}
+     &menu_BLE_Google, &menu_BLE_Flipper, &menu_BLE_Spam_All, &menu_BLE_Spoof_Airtag,
+     &menu_BLE_BadBLE}
 };
 
 S_M1_Menu_t menu_Bluetooth =
@@ -932,12 +940,48 @@ S_M1_Menu_t menu_Bluetooth =
      &menu_BT_Wardriving, &menu_BT_Attacks, &menu_Bluetooth_Config}
 };
 
+/*------------------------------- > APPS -------------------------------------*/
+
+S_M1_Menu_t menu_Apps_Browse =
+{
+    "Browse Apps", external_apps_browse, NULL, NULL, 0, 0, NULL, NULL, NULL
+};
+
+S_M1_Menu_t menu_Apps_SDK =
+{
+    "M1-SDK Info", external_apps_sdk_info, NULL, NULL, 0, 0, NULL, NULL, NULL
+};
+
+S_M1_Menu_t menu_Apps =
+{
+    "Apps", NULL, NULL, NULL, 2, 0, menu_m1_icon_apps, NULL,
+    {&menu_Apps_Browse, &menu_Apps_SDK}
+};
+
+/*------------------------------ > BADUSB ------------------------------------*/
+
+S_M1_Menu_t menu_BadUSB_Run =
+{
+    "Run Script", badusb_run_script, NULL, NULL, 0, 0, NULL, NULL, NULL
+};
+
+S_M1_Menu_t menu_BadUSB_Info =
+{
+    "Info", badusb_info, NULL, NULL, 0, 0, NULL, NULL, NULL
+};
+
+S_M1_Menu_t menu_BadUSB =
+{
+    "BadUSB", NULL, NULL, NULL, 2, 0, menu_m1_icon_badusb, NULL,
+    {&menu_BadUSB_Run, &menu_BadUSB_Info}
+};
+
 /*------------------------------- > MAIN MENU --------------------------------*/
 
 const S_M1_Menu_t menu_Main =
 {
-    "Main Menu", NULL, NULL, NULL, 8, 0, NULL, NULL,
-    {&menu_Sub_GHz, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_Settings}
+    "Main Menu", NULL, NULL, NULL, 10, 0, NULL, NULL,
+    {&menu_Sub_GHz, &menu_125KHz_RFID, &menu_NFC, &menu_Infrared, &menu_GPIO, &menu_Wifi, &menu_Bluetooth, &menu_BadUSB, &menu_Apps, &menu_Settings}
 };
 
 
@@ -993,6 +1037,7 @@ void menu_main_handler_task(void *param)
 	S_M1_Main_Q_t q_item;
 	BaseType_t ret;
 
+	sel_item = 0;
 	vTaskDelay(POWER_UP_SYS_CONFIG_WAIT_TIME); // Give some time to startup_config_handler() during power-up
         while(1)
 	{
@@ -1007,6 +1052,16 @@ void menu_main_handler_task(void *param)
 		ret = xQueueReceive(button_events_q_hdl, &this_button_status, 0);
 		if ( ret!=pdTRUE ) // This should never happen!
 			continue; // Wait for a new notification when the attempt to read the button event fails
+		if (pthis_submenu == NULL || menu_ctl.num_menu_items > SUB_MENU_ITEMS_MAX)
+		{
+			menu_main_init();
+			sel_item = 0;
+			menu_update_stat = MENU_UPDATE_INIT;
+		}
+		if (menu_ctl.num_menu_items && menu_ctl.menu_item_active >= menu_ctl.num_menu_items)
+		{
+			menu_ctl.menu_item_active = 0;
+		}
 
 		for (key=0; key<NUM_BUTTONS_MAX; key++)
 	    {
@@ -1019,14 +1074,29 @@ void menu_main_handler_task(void *param)
 	    				{
 	    					if ( m1_device_stat.op_mode==M1_OPERATION_MODE_MENU_ON )
 	    					{
-	                            n_items = pthis_submenu->submenu[menu_ctl.menu_item_active]->num_submenu_items;  // get the number of submenu items of the selected item
+	    						S_M1_Menu_t *next_menu = NULL;
+	    						if (menu_ctl.num_menu_items)
+	    							next_menu = pthis_submenu->submenu[menu_ctl.menu_item_active];
+	    						if (next_menu == NULL)
+	    						{
+	    							key = NUM_BUTTONS_MAX;
+	    							break;
+	    						}
+	                            n_items = next_menu->num_submenu_items;  // get the number of submenu items of the selected item
 	                            menu_ctl.last_selected_items[menu_ctl.menu_level] = menu_ctl.menu_item_active; // save the selected item before going the next menu level
 	                            if ( n_items != 0 ) // This menu item has another submenu?
 	                            {
+	                            	if (menu_ctl.menu_level >= (SUB_MENU_LEVEL_MAX - 1U))
+	                            	{
+	                            		key = NUM_BUTTONS_MAX;
+	                            		break;
+	                            	}
 	                                menu_ctl.menu_level++; // go to next menu level
-	                                menu_ctl.main_menu_ptr[menu_ctl.menu_level] = pthis_submenu->submenu[menu_ctl.menu_item_active];
+	                                menu_ctl.main_menu_ptr[menu_ctl.menu_level] = next_menu;
 	                                pthis_submenu = menu_ctl.main_menu_ptr[menu_ctl.menu_level];
 	                                menu_ctl.this_func = pthis_submenu->sub_func;
+	                                if (n_items > SUB_MENU_ITEMS_MAX)
+	                                	n_items = SUB_MENU_ITEMS_MAX;
 	                            	menu_ctl.num_menu_items = n_items; // update this field
 	                                menu_ctl.menu_item_active = 0; // default for new submenu
 	                                sel_item = 0;
@@ -1038,10 +1108,10 @@ void menu_main_handler_task(void *param)
 	                                menu_update_stat = MENU_UPDATE_RESET;
 	                            } // if ( n_items != 0 )
 
-	                            else if ( pthis_submenu->submenu[menu_ctl.menu_item_active]->sub_func != NULL ) // This menu item has no submenu. Does it have a function to run?
+	                            else if ( next_menu->sub_func != NULL ) // This menu item has no submenu. Does it have a function to run?
 	                            {
 	                                m1_device_stat.op_mode = M1_OPERATION_MODE_SUB_FUNC_RUNNING;
-	                                m1_device_stat.sub_func = pthis_submenu->submenu[menu_ctl.menu_item_active]->sub_func; // let schedule to run the function of the selected submenu item
+	                                m1_device_stat.sub_func = next_menu->sub_func; // let schedule to run the function of the selected submenu item
 	                                //this_button_status.event[key].event = BUTTON_EVENT_IDLE; // clear before return
 	                                // Notify the sub-function handler
 	                                xTaskNotify(subfunc_handler_task_hdl, 0, eNoAction);
