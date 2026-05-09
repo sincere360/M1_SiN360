@@ -5,3 +5,15 @@ artifacts/
 out/
 *.bak
 *.tmp
+
+# IDE files
+.cproject
+.mxproject
+.project
+.settings/
+*.ioc
+
+# Build artifacts
+build.backup*/
+CMakeFiles/
+
